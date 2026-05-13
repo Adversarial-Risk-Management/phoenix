@@ -11,6 +11,9 @@ from phoenix.server.agents.toolsets.external.tools.edit_prompt import (
 from phoenix.server.agents.toolsets.external.tools.read_prompt import (
     READ_PROMPT_TOOL_DEFINITION,
 )
+from phoenix.server.agents.toolsets.external.tools.render_generated_ui import (
+    RENDER_GENERATED_UI_TOOL_DEFINITION,
+)
 from phoenix.server.agents.toolsets.external.tools.set_spans_filter import (
     SET_SPANS_FILTER_TOOL_DEFINITION,
 )
@@ -26,6 +29,7 @@ _EXTERNAL_TOOL_DEFINITIONS_BY_NAME: dict[str, ToolDefinition] = {
         CLONE_PROMPT_INSTANCE_TOOL_DEFINITION,
         EDIT_PROMPT_TOOL_DEFINITION,
         READ_PROMPT_TOOL_DEFINITION,
+        RENDER_GENERATED_UI_TOOL_DEFINITION,
         SET_SPANS_FILTER_TOOL_DEFINITION,
         SET_TIME_RANGE_TOOL_DEFINITION,
     )
@@ -43,6 +47,7 @@ __all__ = [
     "CLONE_PROMPT_INSTANCE_TOOL_DEFINITION",
     "EDIT_PROMPT_TOOL_DEFINITION",
     "READ_PROMPT_TOOL_DEFINITION",
+    "RENDER_GENERATED_UI_TOOL_DEFINITION",
     "SET_SPANS_FILTER_TOOL_DEFINITION",
     "SET_TIME_RANGE_TOOL_DEFINITION",
     "get_external_tool_definition",
