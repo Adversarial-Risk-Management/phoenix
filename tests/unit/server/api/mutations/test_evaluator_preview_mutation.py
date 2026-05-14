@@ -299,10 +299,19 @@ class TestInlineCodeEvaluatorPreviewMutation:
         gql_client: AsyncGraphQLClient,
         sandbox_config: models.SandboxConfig,
     ) -> None:
+        # The runner goes through SandboxSessionManager (registered in
+        # the app lifespan), so the backend sees the provider-native
+        # binding API: find_or_create_session -> handle, then
+        # execute_in_session(handle, code, timeout). Mocking the old
+        # one-shot ``execute`` no longer intercepts the call path.
+        handle = object()
         backend = AsyncMock()
-        backend.execute = AsyncMock(
+        backend.find_or_create_session = AsyncMock(return_value=handle)
+        backend.execute_in_session = AsyncMock(
             return_value=ExecutionResult(stdout="1.0", stderr="", error=None)
         )
+        backend.close_session = AsyncMock(return_value=None)
+        backend.close = AsyncMock(return_value=None)
 
         with patch(
             "phoenix.server.sandbox.build_sandbox_backend",
