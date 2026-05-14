@@ -800,7 +800,7 @@ async def get_evaluators(
         from phoenix.db.helpers import (
             latest_code_evaluator_versions_by_evaluator_id,
         )
-        from phoenix.server.sandbox import get_or_create_backend
+        from phoenix.server.sandbox import build_sandbox_backend
 
         code_rows = [code_orm_by_id[evaluator_id] for evaluator_id in sorted(code_orm_by_id)]
         latest_versions = await latest_code_evaluator_versions_by_evaluator_id(
@@ -864,7 +864,7 @@ async def get_evaluators(
                 sandbox_key = (live_sandbox_provider.id, live_sandbox_config.id)
                 if sandbox_key not in backend_by_sandbox_key:
                     try:
-                        backend_by_sandbox_key[sandbox_key] = await get_or_create_backend(
+                        backend_by_sandbox_key[sandbox_key] = await build_sandbox_backend(
                             live_sandbox_provider.backend_type,
                             config=live_sandbox_config.config,
                             session=session,
@@ -897,6 +897,7 @@ async def get_evaluators(
                     sandbox_backend=backend,
                     language=language,
                     timeout=sandbox_timeout,
+                    session_key=f"evaluator:{code_row.id}",
                     sandbox_session_manager=sandbox_session_manager,
                 )
                 code_evaluators_by_id[code_row.id] = runner
@@ -2840,26 +2841,24 @@ class CodeEvaluatorRunner(BaseEvaluator):
                     # the manager so it is awaited at shutdown instead of
                     # being cancelled mid-flight.
                     if self._sandbox_session_manager is not None:
-                        self._sandbox_session_manager.schedule_eviction(
-                            self._sandbox_backend, session_key
-                        )
+                        self._sandbox_session_manager.schedule_eviction(session_key)
                     else:
                         # Back-compat path for direct-backend callers (no
-                        # manager plumbed). Fire-and-forget ``stop_session``
+                        # manager plumbed). Fire-and-forget ``close_session``
                         # so the backend sandbox is released; otherwise it
-                        # leaks until idle TTL. Best-effort: swallow stop
+                        # leaks until idle TTL. Best-effort: swallow close
                         # failures and log a warning so the timeout result
                         # still flows back to the caller.
-                        async def _stop_session_quietly() -> None:
+                        async def _close_session_quietly() -> None:
                             try:
-                                await self._sandbox_backend.stop_session(session_key)
-                            except Exception as stop_exc:
+                                await self._sandbox_backend.close_session(session_key)
+                            except Exception as close_exc:
                                 logger.warning(
-                                    "stop_session failed during timeout teardown: %s",
-                                    stop_exc,
+                                    "close_session failed during timeout teardown: %s",
+                                    close_exc,
                                 )
 
-                        asyncio.create_task(_stop_session_quietly())
+                        asyncio.create_task(_close_session_quietly())
                     execution = ExecutionResult(stdout="", stderr="", error="timeout")
                     _record_masked_exception(sandbox_span, exc, masker)
                     sandbox_span.set_status(Status(StatusCode.ERROR, "timeout"))
