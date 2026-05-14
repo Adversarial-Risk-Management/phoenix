@@ -7,7 +7,7 @@ Scope: E2B-specific SDK kwarg shapes, pip-install-via-run_code wiring, and
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -168,9 +168,7 @@ async def test_find_or_create_session_connects_to_oldest_existing() -> None:
     mock_cls.create.assert_not_awaited()
     mock_cls.connect.assert_awaited_once()
     connect_args = mock_cls.connect.call_args
-    assert connect_args.args[0] == "sb-older", (
-        "must connect to the OLDEST sandbox by started_at"
-    )
+    assert connect_args.args[0] == "sb-older", "must connect to the OLDEST sandbox by started_at"
     assert handle is connected
 
 
@@ -419,5 +417,7 @@ class TestE2BCrossWrapperConvergence:
         cls_b.create.assert_not_awaited()
         cls_b.connect.assert_awaited_once()
         # The handles point at the same underlying sandbox_id (cross-wrapper
-        # convergence).
-        assert handle_a.sandbox_id == handle_b.sandbox_id
+        # convergence). Cast through Any: find_or_create_session is typed
+        # ``object`` (opaque handle) by contract, so the test reaches through
+        # to assert on the concrete e2b-shaped attribute.
+        assert cast(Any, handle_a).sandbox_id == cast(Any, handle_b).sandbox_id

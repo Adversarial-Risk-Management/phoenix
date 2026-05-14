@@ -18,7 +18,7 @@ remote sandbox.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, cast
 
 from starlette.datastructures import Secret
 
@@ -189,9 +189,15 @@ class E2BSandboxBackend(SandboxBackend):
             existing.sort(key=lambda info: info.started_at)
             oldest = existing[0]
             try:
-                sandbox = await sandbox_cls.connect(
-                    oldest.sandbox_id,
-                    **self._api_opts(),
+                # SDK's connect() is typed as returning the base AsyncSandbox
+                # class; sandbox_cls is the e2b_code_interpreter subclass, so
+                # the cast restores the actual runtime type.
+                sandbox = cast(
+                    "AsyncSandbox",
+                    await sandbox_cls.connect(
+                        oldest.sandbox_id,
+                        **self._api_opts(),
+                    ),
                 )
             except Exception as exc:
                 # Stale handle (e.g. the sandbox died between list and
@@ -215,8 +221,7 @@ class E2BSandboxBackend(SandboxBackend):
                     )
                     return sandbox
                 logger.debug(
-                    "E2B sandbox_id=%s for key=%r failed alive probe; "
-                    "creating a fresh one",
+                    "E2B sandbox_id=%s for key=%r failed alive probe; creating a fresh one",
                     oldest.sandbox_id,
                     session_key,
                 )
@@ -255,9 +260,12 @@ class E2BSandboxBackend(SandboxBackend):
             survivor: AsyncSandbox = just_created
         else:
             try:
-                survivor = await sandbox_cls.connect(
-                    survivor_info.sandbox_id,
-                    **self._api_opts(),
+                survivor = cast(
+                    "AsyncSandbox",
+                    await sandbox_cls.connect(
+                        survivor_info.sandbox_id,
+                        **self._api_opts(),
+                    ),
                 )
             except Exception as exc:
                 # If the older survivor can't be connected, fall back to
@@ -335,9 +343,7 @@ class E2BSandboxBackend(SandboxBackend):
         """
         try:
             sandbox_cls = self._get_sandbox_cls()
-            async with await sandbox_cls.create(
-                **self._create_kwargs(session_key=None)
-            ) as sb:
+            async with await sandbox_cls.create(**self._create_kwargs(session_key=None)) as sb:
                 await self._install_packages(sb)
                 execution: Execution = await sb.run_code(
                     code,

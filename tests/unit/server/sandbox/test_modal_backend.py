@@ -350,9 +350,7 @@ async def test_find_or_create_session_attaches_on_already_exists_race() -> None:
             winner,
         ]
     )
-    modal_mock.Sandbox.create.aio = AsyncMock(
-        side_effect=modal_mock.exception.AlreadyExistsError()
-    )
+    modal_mock.Sandbox.create.aio = AsyncMock(side_effect=modal_mock.exception.AlreadyExistsError())
 
     with patch.dict(sys.modules, {"modal": modal_mock, "modal.exception": modal_mock.exception}):
         from phoenix.server.sandbox.modal_backend import ModalSandboxBackend
@@ -418,9 +416,7 @@ async def test_close_session_terminates_named_sandbox() -> None:
 @pytest.mark.asyncio
 async def test_close_session_is_idempotent_on_unknown_name() -> None:
     modal_mock = _make_modal_mock()
-    modal_mock.Sandbox.from_name.aio = AsyncMock(
-        side_effect=modal_mock.exception.NotFoundError()
-    )
+    modal_mock.Sandbox.from_name.aio = AsyncMock(side_effect=modal_mock.exception.NotFoundError())
     with patch.dict(sys.modules, {"modal": modal_mock, "modal.exception": modal_mock.exception}):
         from phoenix.server.sandbox.modal_backend import ModalSandboxBackend
 
