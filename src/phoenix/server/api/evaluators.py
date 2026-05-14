@@ -2532,7 +2532,7 @@ class CodeEvaluatorRunner(BaseEvaluator):
     """
     Evaluator that executes user-provided source code in a sandbox.
 
-    The user's source_code must define a callable named ``evaluate`` (D6).
+    The user's source_code must define a callable named ``evaluate``.
     The harness calls ``evaluate(**mapped_inputs)`` and coerces the return
     value via _coerce_output against each output_config.
 
@@ -2746,10 +2746,10 @@ class CodeEvaluatorRunner(BaseEvaluator):
             else:
                 code = self._build_typescript_harness(mapped_inputs)
 
-            # Manager-mediated session reuse (D3/D6). When the runner is
-            # plumbed with a manager, an explicit ``session_key`` overrides
+            # Manager-mediated session reuse. When the runner is plumbed
+            # with a manager, an explicit ``session_key`` overrides
             # ``self._name`` so the inline-evaluator path can survive a
-            # rename mid-iteration without fragmenting sessions (Q3).
+            # rename mid-iteration without fragmenting sessions.
             session_key = (
                 self._session_key_override if self._session_key_override is not None else self._name
             )

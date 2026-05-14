@@ -395,7 +395,7 @@ class TestTempFileCleanup:
 class TestWASMAdapterProbeBinary:
     """WASMAdapter.probe_binary() reports binary-asset availability without I/O.
 
-    The probe is the *capability-probe path* per D3/D4 — it reports whether the
+    The probe is the *capability-probe path* — it reports whether the
     CPython WASM binary is locally resolvable so the GraphQL sandboxBackends
     resolver can surface accurate ``SandboxBackendStatus``. It MUST NOT touch
     the network and MUST NOT create cache files; the assertions below pin
@@ -484,7 +484,7 @@ class TestWASMAdapterProbeBinary:
 class TestSandboxBackendsResolverWASMStatus:
     """The sandboxBackends GraphQL resolver layers ``WASMAdapter.probe_binary()``
     on top of build_backend() so that status reflects binary-asset presence,
-    not just SDK-importability per D4.
+    not just SDK-importability.
 
     These tests exercise the resolver helper ``_get_sandbox_backend_info_with_session``
     directly — it is the single locus of the probe wiring and is more
