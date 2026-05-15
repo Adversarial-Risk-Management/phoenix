@@ -32,14 +32,23 @@ from phoenix.db.types.prompts import (
 )
 from phoenix.server.api.helpers.message_helpers import PlaygroundMessage, create_playground_message
 from phoenix.server.api.helpers.playground_clients import (
+    AnthropicReasoningStreamingClient,
     AnthropicStreamingClient,
     AzureOpenAIReasoningNonStreamingClient,
     AzureOpenAIResponsesAPIStreamingClient,
     AzureOpenAIStreamingClient,
+    Gemini3GoogleStreamingClient,
+    Gemini25GoogleStreamingClient,
+    GoogleStreamingClient,
     OpenAIBaseStreamingClient,
     OpenAIReasoningNonStreamingClient,
     OpenAIResponsesAPIStreamingClient,
     OpenAIStreamingClient,
+    VertexAIAnthropicReasoningStreamingClient,
+    VertexAIAnthropicStreamingClient,
+    VertexAIGemini3StreamingClient,
+    VertexAIGemini20StreamingClient,
+    VertexAIGemini25StreamingClient,
     get_openai_client_class,
 )
 from phoenix.server.api.input_types.ModelClientOptionsInput import OpenAIApiType
@@ -703,3 +712,169 @@ class TestGetOpenAIClientClass:
             None,
         )
         assert client_class is None
+
+
+class TestVertexAIGeminiStreamingClient:
+    @staticmethod
+    def _factory() -> LLMClientFactory[Any]:
+        @asynccontextmanager
+        async def create_client() -> AsyncIterator[Any]:
+            yield None
+
+        return LLMClientFactory(create_client, ("vertex_ai", "test"))
+
+    def test_gemini20_subclass_sets_vertex_ai_provider(self) -> None:
+        client = VertexAIGemini20StreamingClient(
+            client_factory=self._factory(),
+            model_name="gemini-2.0-flash-001",
+        )
+        assert client.provider == "vertex_ai"
+        assert isinstance(client, GoogleStreamingClient)
+
+    def test_gemini25_subclass_sets_vertex_ai_provider(self) -> None:
+        client = VertexAIGemini25StreamingClient(
+            client_factory=self._factory(),
+            model_name="gemini-2.5-pro",
+        )
+        assert client.provider == "vertex_ai"
+        assert isinstance(client, Gemini25GoogleStreamingClient)
+
+    def test_gemini3_subclass_sets_vertex_ai_provider(self) -> None:
+        client = VertexAIGemini3StreamingClient(
+            client_factory=self._factory(),
+            model_name="gemini-3-pro-preview",
+        )
+        assert client.provider == "vertex_ai"
+        assert isinstance(client, Gemini3GoogleStreamingClient)
+
+
+class TestVertexAIAnthropicStreamingClient:
+    @staticmethod
+    def _factory() -> LLMClientFactory[Any]:
+        @asynccontextmanager
+        async def create_client() -> AsyncIterator[Any]:
+            yield None
+
+        return LLMClientFactory(create_client, ("vertex_ai", "test"))
+
+    def test_non_reasoning_subclass_sets_vertex_ai_provider(self) -> None:
+        client = VertexAIAnthropicStreamingClient(
+            client_factory=self._factory(),
+            model_name="claude-sonnet-4-6",
+        )
+        assert client.provider == "vertex_ai"
+        assert isinstance(client, AnthropicStreamingClient)
+
+    def test_reasoning_subclass_sets_vertex_ai_provider(self) -> None:
+        client = VertexAIAnthropicReasoningStreamingClient(
+            client_factory=self._factory(),
+            model_name="claude-opus-4-7",
+        )
+        assert client.provider == "vertex_ai"
+        assert isinstance(client, AnthropicReasoningStreamingClient)
+
+
+class TestGetBuiltinProviderClientVertexAI:
+    @pytest.mark.asyncio
+    async def test_missing_adc_raises_bad_request_with_hint(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from google.auth.exceptions import DefaultCredentialsError
+
+        from phoenix.db.types.model_provider import ModelProvider
+        from phoenix.server.api.exceptions import BadRequest
+        from phoenix.server.api.helpers.playground_clients import _get_builtin_provider_client
+
+        monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+        monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+
+        with patch(
+            "google.auth.default",
+            side_effect=DefaultCredentialsError("no ADC found"),
+        ):
+            session = MagicMock()
+            scalars_result = MagicMock()
+            scalars_result.all = MagicMock(return_value=[])
+            session.scalars = AsyncMock(return_value=scalars_result)
+            decrypt = MagicMock(side_effect=lambda b: b)
+
+            with pytest.raises(BadRequest, match="application-default login"):
+                await _get_builtin_provider_client(
+                    model_provider=ModelProvider.VERTEX_AI,
+                    model_name="gemini-2.5-pro",
+                    connection=None,
+                    headers=None,
+                    session=session,
+                    decrypt=decrypt,
+                    credentials=None,
+                )
+
+    @pytest.mark.asyncio
+    async def test_gemini_routes_through_vertex_subclass(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from phoenix.db.types.model_provider import ModelProvider
+        from phoenix.server.api.helpers.playground_clients import _get_builtin_provider_client
+
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-proj")
+        monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+        fake_creds = MagicMock()
+        with patch("google.auth.default", return_value=(fake_creds, "test-proj")):
+            session = MagicMock()
+            scalars_result = MagicMock()
+            scalars_result.all = MagicMock(return_value=[])
+            session.scalars = AsyncMock(return_value=scalars_result)
+            decrypt = MagicMock(side_effect=lambda b: b)
+
+            client = await _get_builtin_provider_client(
+                model_provider=ModelProvider.VERTEX_AI,
+                model_name="gemini-2.5-pro",
+                connection=None,
+                headers=None,
+                session=session,
+                decrypt=decrypt,
+                credentials=None,
+            )
+
+        assert client.provider == "vertex_ai"
+        assert client.__class__.__name__ == "VertexAIGemini25StreamingClient"
+
+    @pytest.mark.asyncio
+    async def test_claude_routes_through_vertex_anthropic_subclass(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from phoenix.db.types.model_provider import ModelProvider
+        from phoenix.server.api.helpers.playground_clients import _get_builtin_provider_client
+
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-proj")
+
+        with (
+            patch("google.auth.default", return_value=(MagicMock(), "test-proj")),
+            patch("anthropic.AsyncAnthropicVertex") as mock_anthropic,
+        ):
+            mock_anthropic.return_value = MagicMock()
+            session = MagicMock()
+            scalars_result = MagicMock()
+            scalars_result.all = MagicMock(return_value=[])
+            session.scalars = AsyncMock(return_value=scalars_result)
+            decrypt = MagicMock(side_effect=lambda b: b)
+
+            client = await _get_builtin_provider_client(
+                model_provider=ModelProvider.VERTEX_AI,
+                model_name="claude-3-5-sonnet-20241022",
+                connection=None,
+                headers=None,
+                session=session,
+                decrypt=decrypt,
+                credentials=None,
+            )
+
+        assert client.provider == "vertex_ai"
+        assert client.__class__.__name__ == "VertexAIAnthropicStreamingClient"

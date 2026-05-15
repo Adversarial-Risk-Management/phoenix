@@ -55,10 +55,16 @@ export type InvocationFamily =
  * pick the right Phoenix provider adapter (canonical config type, form-field
  * projection, prompt serialization) for a model.
  *
+ * The optional `modelName` is only consulted for providers that front
+ * multiple model families (currently Vertex AI, which serves both Gemini
+ * and Claude). For everything else the family is determined by provider
+ * alone.
+ *
  * See {@link InvocationFamily} for what the family represents.
  */
 export function getInvocationFamilyForProvider(
-  provider: ModelProvider
+  provider: ModelProvider,
+  modelName?: string
 ): InvocationFamily {
   switch (provider) {
     case "OPENAI":
@@ -79,6 +85,13 @@ export function getInvocationFamilyForProvider(
       return InvocationFamily.GOOGLE_GENAI;
     case "AWS":
       return InvocationFamily.AWS_BEDROCK;
+    case "VERTEX_AI":
+      // Vertex AI fronts both Gemini and Claude. Dispatch by model name
+      // prefix so claude-* models get the Anthropic invocation-parameter
+      // shape and everything else (gemini-*) stays on Google/Gemini.
+      return modelName?.toLowerCase().startsWith("claude")
+        ? InvocationFamily.ANTHROPIC
+        : InvocationFamily.GOOGLE_GENAI;
   }
   return assertUnreachable(provider);
 }

@@ -896,6 +896,21 @@ describe("getModelProviderFromModelName", () => {
       DEFAULT_MODEL_PROVIDER
     );
   });
+
+  // VERTEX_AI shares prefixes ("gemini", "claude") with GOOGLE and ANTHROPIC.
+  // The iteration order of modelProviderToModelPrefixMap places VERTEX_AI
+  // after GOOGLE and ANTHROPIC, so a raw model name must continue to route
+  // to the non-Vertex provider. Vertex routing must be an explicit user
+  // choice via the provider dropdown.
+  it("should return GOOGLE for gemini-* by default (Vertex must be explicit)", () => {
+    expect(getModelProviderFromModelName("gemini-2.5-pro")).toEqual("GOOGLE");
+  });
+
+  it("should return ANTHROPIC for claude-* by default (Vertex must be explicit)", () => {
+    expect(getModelProviderFromModelName("claude-sonnet-4-6")).toEqual(
+      "ANTHROPIC"
+    );
+  });
 });
 
 describe("processAttributeToolCalls", () => {
@@ -923,6 +938,10 @@ describe("processAttributeToolCalls", () => {
     ],
     // TODO(apowell): #5348 Add Google tool tests
     GOOGLE: ["GOOGLE", testSpanToolCall, expectedUnknownToolCall],
+    // VERTEX_AI fronts both Gemini and Claude. Default to the GOOGLE shape
+    // here; Claude-on-Vertex routing happens at the React-component layer via
+    // `effectiveProviderForToolSchema` and is exercised in its own tests.
+    VERTEX_AI: ["VERTEX_AI", testSpanToolCall, expectedUnknownToolCall],
     CEREBRAS: ["CEREBRAS", testSpanToolCall, expectedTestOpenAIToolCall],
     FIREWORKS: ["FIREWORKS", testSpanToolCall, expectedTestOpenAIToolCall],
     GROQ: ["GROQ", testSpanToolCall, expectedTestOpenAIToolCall],
@@ -1526,6 +1545,9 @@ describe("getToolsFromAttributes", () => {
     ],
     // TODO(apowell): #5348 Add Google tool tests
     GOOGLE: ["GOOGLE", testSpanOpenAITool, testSpanOpenAIToolCanonical],
+    // VERTEX_AI fronts both Gemini and Claude. Default to the GOOGLE shape
+    // for the static schema test; Claude-on-Vertex routing happens elsewhere.
+    VERTEX_AI: ["VERTEX_AI", testSpanOpenAITool, testSpanOpenAIToolCanonical],
     CEREBRAS: ["CEREBRAS", testSpanOpenAITool, testSpanOpenAIToolCanonical],
     FIREWORKS: ["FIREWORKS", testSpanOpenAITool, testSpanOpenAIToolCanonical],
     GROQ: ["GROQ", testSpanOpenAITool, testSpanOpenAIToolCanonical],

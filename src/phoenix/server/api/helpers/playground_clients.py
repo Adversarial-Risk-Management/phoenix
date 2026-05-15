@@ -2645,6 +2645,38 @@ class AnthropicReasoningStreamingClient(AnthropicStreamingClient):
     pass
 
 
+@register_llm_client(
+    provider_key=GenerativeProviderKey.VERTEX_AI,
+    model_names=[PROVIDER_DEFAULT, "claude-opus-4-7"],
+)
+class VertexAIAnthropicStreamingClient(AnthropicStreamingClient):
+    def __init__(
+        self,
+        *,
+        client_factory: ClientFactory["AsyncAnthropic"],
+        model_name: str,
+        provider: str = "vertex_ai",
+    ) -> None:
+        super().__init__(client_factory=client_factory, model_name=model_name, provider=provider)
+        self.provider = "vertex_ai"
+
+
+@register_llm_client(
+    provider_key=GenerativeProviderKey.VERTEX_AI,
+    model_names=ANTHROPIC_REASONING_MODELS,
+)
+class VertexAIAnthropicReasoningStreamingClient(AnthropicReasoningStreamingClient):
+    def __init__(
+        self,
+        *,
+        client_factory: ClientFactory["AsyncAnthropic"],
+        model_name: str,
+        provider: str = "vertex_ai",
+    ) -> None:
+        super().__init__(client_factory=client_factory, model_name=model_name, provider=provider)
+        self.provider = "vertex_ai"
+
+
 GEMINI_2_0_MODELS = [
     PROVIDER_DEFAULT,
     "gemini-2.0-flash-lite",  # Will be deprecated and will be shut down on June 1, 2026.
@@ -3032,6 +3064,7 @@ class Gemini25GoogleStreamingClient(GoogleStreamingClient):
 
 GEMINI_3_MODELS = [
     "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite",
     "gemini-3-pro-preview",
     "gemini-3-flash-preview",
 ]
@@ -3067,6 +3100,54 @@ class Gemini3GoogleStreamingClient(Gemini25GoogleStreamingClient):
             stream_model_output=stream_model_output,
         ):
             yield chunk
+
+
+@register_llm_client(
+    provider_key=GenerativeProviderKey.VERTEX_AI,
+    model_names=GEMINI_2_0_MODELS,
+)
+class VertexAIGemini20StreamingClient(GoogleStreamingClient):
+    def __init__(
+        self,
+        *,
+        client_factory: ClientFactory["GoogleAsyncClient"],
+        model_name: str,
+        provider: str = "vertex_ai",
+    ) -> None:
+        super().__init__(client_factory=client_factory, model_name=model_name, provider=provider)
+        self.provider = "vertex_ai"
+
+
+@register_llm_client(
+    provider_key=GenerativeProviderKey.VERTEX_AI,
+    model_names=GEMINI_2_5_MODELS,
+)
+class VertexAIGemini25StreamingClient(Gemini25GoogleStreamingClient):
+    def __init__(
+        self,
+        *,
+        client_factory: ClientFactory["GoogleAsyncClient"],
+        model_name: str,
+        provider: str = "vertex_ai",
+    ) -> None:
+        super().__init__(client_factory=client_factory, model_name=model_name, provider=provider)
+        self.provider = "vertex_ai"
+
+
+@register_llm_client(
+    provider_key=GenerativeProviderKey.VERTEX_AI,
+    model_names=GEMINI_3_MODELS,
+)
+class VertexAIGemini3StreamingClient(Gemini3GoogleStreamingClient):
+    def __init__(
+        self,
+        *,
+        client_factory: ClientFactory["GoogleAsyncClient"],
+        model_name: str,
+        provider: str = "vertex_ai",
+    ) -> None:
+        super().__init__(client_factory=client_factory, model_name=model_name, provider=provider)
+        self.provider = "vertex_ai"
 
 
 def initialize_playground_clients() -> None:
@@ -3531,6 +3612,129 @@ async def _get_builtin_provider_client(
             )
         return Gemini3GoogleStreamingClient(
             client_factory=google_client_factory,
+            model_name=model_name,
+            provider=provider,
+        )
+
+    elif provider_key == GenerativeProviderKey.VERTEX_AI:
+        project = (
+            _get_credential_from_input(credentials, "GOOGLE_CLOUD_PROJECT")
+            or (await _resolve_secrets(session, decrypt, "GOOGLE_CLOUD_PROJECT")).get(
+                "GOOGLE_CLOUD_PROJECT"
+            )
+            or getenv("GOOGLE_CLOUD_PROJECT")
+        )
+        # TODO: pick the location per model family. "global" serves preview
+        # Gemini models (e.g. gemini-3.1-flash-lite) that are only deployed on
+        # the global endpoint, but Claude on Vertex requires a multi-region
+        # ("us"/"eu") or single-region (e.g. "us-east5") endpoint and 404s on
+        # "global". Today the user has to override per-request in the playground
+        # for Claude. Long-term: branch by model family here.
+        location = (
+            _get_credential_from_input(credentials, "GOOGLE_CLOUD_LOCATION")
+            or (await _resolve_secrets(session, decrypt, "GOOGLE_CLOUD_LOCATION")).get(
+                "GOOGLE_CLOUD_LOCATION"
+            )
+            or getenv("GOOGLE_CLOUD_LOCATION")
+            or "global"
+        )
+
+        try:
+            import google.auth
+            from google.auth.exceptions import DefaultCredentialsError
+        except ImportError:
+            raise BadRequest("google-auth package not installed. Run: pip install google-auth")
+
+        # ADC discovery must happen BEFORE any without_env_vars context so that
+        # GOOGLE_APPLICATION_CREDENTIALS (a file path env var) remains visible.
+        try:
+            adc_credentials, adc_project = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+        except DefaultCredentialsError as e:
+            raise BadRequest(
+                f"Vertex AI requires Application Default Credentials. "
+                f"Run `gcloud auth application-default login` locally, or run "
+                f"Phoenix on a GCP workload with an attached service account. "
+                f"({e})"
+            )
+
+        project = project or adc_project
+        if not project:
+            raise BadRequest(
+                "GOOGLE_CLOUD_PROJECT is required for Vertex AI. "
+                "Set the env var, configure it via the playground UI, "
+                "or ensure your ADC credentials carry a default project."
+            )
+
+        if model_name.startswith("claude"):
+            try:
+                from anthropic import AsyncAnthropicVertex
+            except ImportError:
+                raise BadRequest("anthropic package not installed. Run: pip install anthropic")
+
+            def create_vertex_anthropic_client() -> AbstractAsyncContextManager["AsyncAnthropic"]:
+                return cast(
+                    "AbstractAsyncContextManager[AsyncAnthropic]",
+                    AsyncAnthropicVertex(
+                        project_id=project,
+                        region=location,
+                        default_headers=headers,
+                    ),
+                )
+
+            vertex_anthropic_client_factory: ClientFactory["AsyncAnthropic"] = LLMClientFactory(
+                create_vertex_anthropic_client,
+                anthropic_rate_limit_key(project, location),
+            )
+            if model_name in ANTHROPIC_REASONING_MODELS:
+                return VertexAIAnthropicReasoningStreamingClient(
+                    client_factory=vertex_anthropic_client_factory,
+                    model_name=model_name,
+                    provider=provider,
+                )
+            return VertexAIAnthropicStreamingClient(
+                client_factory=vertex_anthropic_client_factory,
+                model_name=model_name,
+                provider=provider,
+            )
+
+        try:
+            from google.genai.client import Client as GoogleGenAIClient
+        except ImportError:
+            raise BadRequest("Google GenAI package not installed. Run: pip install google-genai")
+
+        @asynccontextmanager
+        async def create_vertex_google_client() -> "AsyncIterator[GoogleAsyncClient]":
+            async with GoogleGenAIClient(
+                vertexai=True,
+                project=project,
+                location=location,
+                credentials=adc_credentials,
+            ).aio as client:
+                yield client
+
+        vertex_google_client_factory = cast(
+            "LLMClientFactory[GoogleAsyncClient]",
+            LLMClientFactory(
+                create_vertex_google_client,
+                google_rate_limit_key(project, location),
+            ),
+        )
+        if model_name in GEMINI_2_0_MODELS:
+            return VertexAIGemini20StreamingClient(
+                client_factory=vertex_google_client_factory,
+                model_name=model_name,
+                provider=provider,
+            )
+        if model_name in GEMINI_2_5_MODELS:
+            return VertexAIGemini25StreamingClient(
+                client_factory=vertex_google_client_factory,
+                model_name=model_name,
+                provider=provider,
+            )
+        return VertexAIGemini3StreamingClient(
+            client_factory=vertex_google_client_factory,
             model_name=model_name,
             provider=provider,
         )
