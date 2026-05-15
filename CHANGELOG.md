@@ -1,5 +1,26 @@
 # Changelog
 
+## [15.10.0](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-v15.9.0...arize-phoenix-v15.10.0) (2026-05-15)
+
+
+### Features
+
+* add trace feedback toolbar to session turns ([#13189](https://github.com/Arize-ai/phoenix/issues/13189)) ([1bd96b9](https://github.com/Arize-ai/phoenix/commit/1bd96b9a824dd2457c6f60e54897a6e1d5d92132))
+* **agents:** curate agent model menu ([#13190](https://github.com/Arize-ai/phoenix/issues/13190)) ([de8c915](https://github.com/Arize-ai/phoenix/commit/de8c9157964101eb58c288a27b6e983acf534c89))
+* cap agent session retention ([#13220](https://github.com/Arize-ai/phoenix/issues/13220)) ([1c28249](https://github.com/Arize-ai/phoenix/commit/1c282498eced055454b254359d148a82087ecbbd))
+* pxi button styles and thinking glyph animation ([#13250](https://github.com/Arize-ai/phoenix/issues/13250)) ([4766244](https://github.com/Arize-ai/phoenix/commit/47662443c835b0ffa12800e7668c2f8f01f81575))
+
+
+### Bug Fixes
+
+* adjust session turn output metadata layout ([#13221](https://github.com/Arize-ai/phoenix/issues/13221)) ([1ab474d](https://github.com/Arize-ai/phoenix/commit/1ab474d3bb42bb4d788e9e3abe91044fbfb76f39))
+* **cost:** update built-in model token prices ([#13244](https://github.com/Arize-ai/phoenix/issues/13244)) ([56faa02](https://github.com/Arize-ai/phoenix/commit/56faa023b8dd9ba0a82825c2f0ad674393053685))
+
+
+### Documentation
+
+* Add Phoenix release notes for 05-08-2026 through 05-13-2026 ([#13206](https://github.com/Arize-ai/phoenix/issues/13206)) ([a428b9c](https://github.com/Arize-ai/phoenix/commit/a428b9cf00245cc5b1c29be9f8c2309a09275504))
+
 ## [15.9.0](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-v15.8.0...arize-phoenix-v15.9.0) (2026-05-14)
 
 
